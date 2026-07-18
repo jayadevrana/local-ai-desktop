@@ -1,0 +1,19 @@
+[project]
+name = "tradebridge-windows-executor"
+version = "0.1.0"
+description = "Windows execution agent for TradeBridge Cloud"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.8.2",
+  "requests>=2.32.3",
+  "psutil>=7.0.0"
+]
+
+[project.optional-dependencies]
+windows = [
+  "pywin32>=306; platform_system=='Windows'",
+  "MetaTrader5>=5.0.47; platform_system=='Windows'"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

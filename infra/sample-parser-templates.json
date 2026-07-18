@@ -1,0 +1,24 @@
+[
+  {
+    "name": "TradingView KV Default",
+    "format": "KV",
+    "fieldMappings": [
+      { "sourceKey": "action", "targetField": "action", "required": true },
+      { "sourceKey": "symbol", "targetField": "symbol", "required": true },
+      { "sourceKey": "risk", "targetField": "volumeValue" },
+      { "sourceKey": "sl", "targetField": "stopLoss" },
+      { "sourceKey": "tp", "targetField": "takeProfit" }
+    ],
+    "samplePayload": "action=buy,symbol=EURUSD,risk=1,sl=1.0865,tp=1.0940"
+  },
+  {
+    "name": "Compact Text Momentum",
+    "format": "TEXT",
+    "fieldMappings": [
+      { "sourceKey": "action", "targetField": "action", "required": true },
+      { "sourceKey": "symbol", "targetField": "symbol", "required": true },
+      { "sourceKey": "risk", "targetField": "volumeValue" }
+    ],
+    "samplePayload": "buy symbol:NAS100 risk:1.25 sl:21000 tp:21250"
+  }
+]

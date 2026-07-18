@@ -1,0 +1,563 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  TRADER
+  VIEWER
+  SUPPORT_READONLY
+}
+
+enum SubscriptionInterval {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum MT5AccountStatus {
+  DRAFT
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  LOCKED
+  ERROR
+  ARCHIVED
+}
+
+enum SecretStatus {
+  ACTIVE
+  ROTATED
+  REVOKED
+}
+
+enum WebhookStatus {
+  ACTIVE
+  INACTIVE
+  ROTATED
+}
+
+enum ParserFormat {
+  JSON
+  KV
+  TEXT
+}
+
+enum SignalAction {
+  BUY_MARKET
+  SELL_MARKET
+  BUY_LIMIT
+  SELL_LIMIT
+  BUY_STOP
+  SELL_STOP
+  CLOSE_ALL
+  CLOSE_SYMBOL
+  CLOSE_BUY
+  CLOSE_SELL
+  CLOSE_BY_MAGIC
+  PARTIAL_CLOSE
+  MOVE_SL
+  MOVE_TP
+  MOVE_TO_BREAKEVEN
+  REVERSE_POSITION
+  CANCEL_PENDING
+  CANCEL_ALL_PENDING
+}
+
+enum ExecutionJobStatus {
+  RECEIVED
+  QUEUED
+  ROUTED
+  DISPATCHED
+  CLAIMED
+  EXECUTING
+  SUCCEEDED
+  FAILED
+  RETRYING
+  DEAD_LETTER
+  CANCELED
+}
+
+enum WindowsNodeStatus {
+  PENDING
+  ACTIVE
+  DEGRADED
+  DRAINING
+  OFFLINE
+  DISABLED
+}
+
+enum TerminalInstanceStatus {
+  PROVISIONING
+  STARTING
+  ONLINE
+  OFFLINE
+  ERROR
+  RESTARTING
+}
+
+model User {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  email              String                 @unique
+  fullName           String
+  passwordHash       String?
+  isEmailVerified    Boolean                @default(false)
+  status             UserStatus             @default(ACTIVE)
+  totpEnabled        Boolean                @default(false)
+  lastLoginAt        DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  memberships        OrganizationMember[]
+  sessions           Session[]
+  magicLinks         MagicLinkToken[]
+  totpCredentials    TotpCredential[]
+  auditLogs          AuditLog[]
+  supportImpersonations SupportImpersonationAudit[] @relation("ImpersonatedBy")
+}
+
+model Organization {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  name                 String
+  slug                 String                  @unique
+  isSuspended          Boolean                 @default(false)
+  softDeletedAt        DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  members              OrganizationMember[]
+  subscriptions        Subscription[]
+  mt5Accounts          Mt5Account[]
+  parserTemplates      ParserTemplate[]
+  riskProfiles         RiskProfile[]
+  signalEvents         SignalEvent[]
+  executionJobs        ExecutionJob[]
+  auditLogs            AuditLog[]
+  webhookEndpoints     WebhookEndpoint[]
+  apiKeys              ApiKey[]
+  supportImpersonationAudits SupportImpersonationAudit[]
+}
+
+model OrganizationMember {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  userId         String            @db.Uuid
+  role           OrganizationRole
+  invitedByUserId String?          @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Session {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  refreshTokenHash String
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  lastSeenAt       DateTime?
+  createdAt        DateTime @default(now())
+  revokedAt        DateTime?
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model MagicLinkToken {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  email       String
+  tokenHash   String   @unique
+  redirectUrl String?
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, expiresAt])
+}
+
+model TotpCredential {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @db.Uuid
+  encryptedSecret    String
+  iv                 String
+  authTag            String
+  backupCodesHash    Json?
+  createdAt          DateTime @default(now())
+  verifiedAt         DateTime?
+  disabledAt         DateTime?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, disabledAt])
+}
+
+model SubscriptionPlan {
+  id                 String               @id @default(uuid()) @db.Uuid
+  code               String               @unique
+  name               String
+  interval           SubscriptionInterval
+  amountCents        Int
+  currency           String               @default("USD")
+  maxOrganizations   Int                  @default(1)
+  maxUsers           Int
+  maxMt5Accounts     Int
+  features           Json
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  subscriptions      Subscription[]
+}
+
+model Subscription {
+  id                   String              @id @default(uuid()) @db.Uuid
+  organizationId       String              @db.Uuid
+  subscriptionPlanId   String              @db.Uuid
+  provider             String              @default("stripe")
+  providerCustomerId   String?
+  providerSubscriptionId String?
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionPlan     SubscriptionPlan    @relation(fields: [subscriptionPlanId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+}
+
+model RiskProfile {
+  id                         String       @id @default(uuid()) @db.Uuid
+  organizationId             String       @db.Uuid
+  name                       String
+  defaultVolumeMode          String
+  defaultVolumeValue         Decimal      @db.Decimal(18, 8)
+  maxLotCap                  Decimal?     @db.Decimal(18, 8)
+  minLot                     Decimal?     @db.Decimal(18, 8)
+  lotStep                    Decimal      @db.Decimal(18, 8)
+  fallbackStopLossPips       Decimal?     @db.Decimal(18, 8)
+  allowBrokerMinLotOverride  Boolean      @default(true)
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+  organization               Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mt5Accounts                Mt5Account[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Mt5Account {
+  id                  String             @id @default(uuid()) @db.Uuid
+  organizationId      String             @db.Uuid
+  nickname            String
+  brokerName          String
+  serverName          String
+  login               String
+  accountCurrency     String?
+  status              MT5AccountStatus   @default(PROVISIONING)
+  symbolPreferences   Json?
+  magicNumberBase     Int?
+  assignedNodeId      String?            @db.Uuid
+  defaultRiskProfileId String?           @db.Uuid
+  onboardingState     Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credentialSecretRef Mt5CredentialSecretRef?
+  webhooks            WebhookEndpoint[]
+  parserTemplates     ParserTemplate[]
+  symbolMappings      SymbolMapping[]
+  riskProfile         RiskProfile?       @relation(fields: [defaultRiskProfileId], references: [id], onDelete: SetNull)
+  signalEvents        SignalEvent[]
+  executionJobs       ExecutionJob[]
+  assignedNode        WindowsNode?       @relation(fields: [assignedNodeId], references: [id], onDelete: SetNull)
+  terminalInstance    TerminalInstance?
+
+  @@unique([organizationId, login, serverName])
+  @@index([organizationId, status])
+  @@index([assignedNodeId])
+}
+
+model Mt5CredentialSecretRef {
+  id            String       @id @default(uuid()) @db.Uuid
+  mt5AccountId  String       @unique @db.Uuid
+  cipherText    String
+  iv            String
+  authTag       String
+  keyVersion    String
+  algorithm     String       @default("aes-256-gcm")
+  status        SecretStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  rotatedAt     DateTime?
+  mt5Account    Mt5Account   @relation(fields: [mt5AccountId], references: [id], onDelete: Cascade)
+}
+
+model WebhookEndpoint {
+  id                String         @id @default(uuid()) @db.Uuid
+  organizationId    String         @db.Uuid
+  mt5AccountId      String         @db.Uuid
+  parserTemplateId  String?        @db.Uuid
+  sourceLabel       String         @default("tradingview")
+  tokenHash         String         @unique
+  tokenPrefix       String
+  secretHash        String?
+  status            WebhookStatus  @default(ACTIVE)
+  isActive          Boolean        @default(true)
+  allowedStrategyIds String[]
+  requestsPerMinute Int            @default(60)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  lastUsedAt        DateTime?
+  mt5Account        Mt5Account     @relation(fields: [mt5AccountId], references: [id], onDelete: Cascade)
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parserTemplate    ParserTemplate? @relation(fields: [parserTemplateId], references: [id], onDelete: SetNull)
+  signalEvents      SignalEvent[]
+
+  @@index([organizationId, mt5AccountId, isActive])
+}
+
+model ParserTemplate {
+  id                String         @id @default(uuid()) @db.Uuid
+  organizationId    String         @db.Uuid
+  mt5AccountId      String?        @db.Uuid
+  name              String
+  format            ParserFormat
+  presetKey         String?
+  definition        Json
+  samplePayload     String?
+  isDefault         Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mt5Account        Mt5Account?    @relation(fields: [mt5AccountId], references: [id], onDelete: SetNull)
+  webhookEndpoints  WebhookEndpoint[]
+  signalEvents      SignalEvent[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, mt5AccountId])
+}
+
+model SymbolMapping {
+  id             String      @id @default(uuid()) @db.Uuid
+  organizationId String      @db.Uuid
+  mt5AccountId   String      @db.Uuid
+  externalSymbol String
+  brokerSymbol   String
+  comment        String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  mt5Account     Mt5Account  @relation(fields: [mt5AccountId], references: [id], onDelete: Cascade)
+
+  @@unique([mt5AccountId, externalSymbol])
+  @@index([organizationId, mt5AccountId])
+}
+
+model SignalEvent {
+  id                String              @id @default(uuid()) @db.Uuid
+  organizationId    String              @db.Uuid
+  mt5AccountId      String              @db.Uuid
+  webhookEndpointId String              @db.Uuid
+  parserTemplateId  String?             @db.Uuid
+  signalAction      SignalAction?
+  sourceLabel       String
+  strategyId        String?
+  rawPayload        Json
+  rawPayloadText    String
+  normalizedPayload Json?
+  idempotencyKey    String              @unique
+  correlationId     String
+  status            ExecutionJobStatus  @default(RECEIVED)
+  lastError         String?
+  receivedAt        DateTime            @default(now())
+  processedAt       DateTime?
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mt5Account        Mt5Account          @relation(fields: [mt5AccountId], references: [id], onDelete: Cascade)
+  webhookEndpoint   WebhookEndpoint     @relation(fields: [webhookEndpointId], references: [id], onDelete: Restrict)
+  parserTemplate    ParserTemplate?     @relation(fields: [parserTemplateId], references: [id], onDelete: SetNull)
+  executionJobs     ExecutionJob[]
+
+  @@index([organizationId, receivedAt])
+  @@index([mt5AccountId, receivedAt])
+}
+
+model WindowsNode {
+  id                  String             @id @default(uuid()) @db.Uuid
+  nodeName            String
+  hostname            String
+  status              WindowsNodeStatus  @default(PENDING)
+  nodeAuthTokenHash   String             @unique
+  capabilities        String[]
+  maxAccounts         Int
+  agentVersion        String
+  platform            String             @default("windows")
+  metadata            Json?
+  heartbeatIntervalSeconds Int           @default(15)
+  lastHeartbeatAt     DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  mt5Accounts         Mt5Account[]
+  heartbeats          NodeHeartbeat[]
+  terminalInstances   TerminalInstance[]
+  executionJobs       ExecutionJob[]
+
+  @@index([status, lastHeartbeatAt])
+}
+
+model NodeHeartbeat {
+  id                 String             @id @default(uuid()) @db.Uuid
+  nodeId             String             @db.Uuid
+  status             WindowsNodeStatus
+  cpuLoadPercent     Decimal?           @db.Decimal(5, 2)
+  memoryUsedMb       Int?
+  activeTerminalCount Int?
+  queuedJobCount     Int?
+  diagnostics        Json?
+  createdAt          DateTime           @default(now())
+  node               WindowsNode        @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, createdAt])
+}
+
+model TerminalInstance {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  mt5AccountId        String                 @unique @db.Uuid
+  nodeId              String                 @db.Uuid
+  terminalPath        String?
+  workingDirectory    String
+  dataDirectory       String
+  portableMode        Boolean                @default(true)
+  configVersion       Int                    @default(1)
+  status              TerminalInstanceStatus @default(PROVISIONING)
+  lastSeenAt          DateTime?
+  processId           Int?
+  lastError           String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  mt5Account          Mt5Account             @relation(fields: [mt5AccountId], references: [id], onDelete: Cascade)
+  node                WindowsNode            @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  executionJobs       ExecutionJob[]
+
+  @@index([nodeId, status])
+}
+
+model ExecutionJob {
+  id                 String              @id @default(uuid()) @db.Uuid
+  organizationId     String              @db.Uuid
+  mt5AccountId       String              @db.Uuid
+  signalEventId      String              @db.Uuid
+  assignedNodeId     String?             @db.Uuid
+  terminalInstanceId String?             @db.Uuid
+  status             ExecutionJobStatus  @default(QUEUED)
+  queueName          String              @default("signal-ingress")
+  priority           Int                 @default(10)
+  retryCount         Int                 @default(0)
+  maxRetries         Int                 @default(5)
+  availableAt        DateTime            @default(now())
+  claimedAt          DateTime?
+  timeoutAt          DateTime?
+  correlationId      String
+  executionPayload   Json
+  lastError          String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  completedAt        DateTime?
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mt5Account         Mt5Account          @relation(fields: [mt5AccountId], references: [id], onDelete: Cascade)
+  signalEvent        SignalEvent         @relation(fields: [signalEventId], references: [id], onDelete: Cascade)
+  assignedNode       WindowsNode?        @relation(fields: [assignedNodeId], references: [id], onDelete: SetNull)
+  terminalInstance   TerminalInstance?   @relation(fields: [terminalInstanceId], references: [id], onDelete: SetNull)
+  executionResults   ExecutionResult[]
+
+  @@index([status, availableAt])
+  @@index([assignedNodeId, status])
+  @@index([organizationId, mt5AccountId, createdAt])
+}
+
+model ExecutionResult {
+  id             String       @id @default(uuid()) @db.Uuid
+  executionJobId String       @db.Uuid
+  attemptNumber  Int
+  status         ExecutionJobStatus
+  brokerOrderId  String?
+  brokerDealId   String?
+  retcode        Int?
+  message        String
+  details        Json?
+  occurredAt     DateTime
+  createdAt      DateTime     @default(now())
+  executionJob   ExecutionJob @relation(fields: [executionJobId], references: [id], onDelete: Cascade)
+
+  @@unique([executionJobId, attemptNumber])
+  @@index([executionJobId, occurredAt])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String?      @db.Uuid
+  actorUserId    String?      @db.Uuid
+  action         String
+  resourceType   String
+  resourceId     String
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime     @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actorUser      User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model ApiKey {
+  id             String      @id @default(uuid()) @db.Uuid
+  organizationId String      @db.Uuid
+  label          String
+  tokenHash      String      @unique
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime    @default(now())
+  revokedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, revokedAt])
+}
+
+model SupportImpersonationAudit {
+  id                  String        @id @default(uuid()) @db.Uuid
+  organizationId      String        @db.Uuid
+  supportUserId       String?       @db.Uuid
+  impersonatedUserId  String        @db.Uuid
+  reason              String
+  startedAt           DateTime      @default(now())
+  endedAt             DateTime?
+  organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supportUser         User?         @relation("ImpersonatedBy", fields: [supportUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, startedAt])
+}

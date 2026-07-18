@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --color-canvas: 8 13 20;
+  --color-surface: 14 20 31;
+  --color-panel: 12 17 27;
+  --color-panel-alt: 18 24 38;
+  --color-primary: 122 162 255;
+  --color-secondary: 114 195 255;
+  --color-accent: 255 191 117;
+  --color-success: 103 218 173;
+  --color-warning: 255 191 117;
+  --color-danger: 255 113 143;
+  --color-ink: 234 239 248;
+  --color-muted: 146 160 182;
+  --color-line: 255 255 255;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(96, 134, 214, 0.16), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(103, 167, 255, 0.08), transparent 22%),
+    rgb(var(--color-canvas));
+  color: rgb(var(--color-ink));
+  overflow: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.prose pre code {
+  background: transparent;
+}

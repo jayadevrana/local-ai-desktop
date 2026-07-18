@@ -1,0 +1,29 @@
+{
+  "name": "@tradebridge/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsup src/main.ts --format esm --target node20 --out-dir dist --sourcemap",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tradebridge/config": "workspace:*",
+    "@tradebridge/db": "workspace:*",
+    "@tradebridge/types": "workspace:*",
+    "bullmq": "^5.46.1",
+    "ioredis": "^5.6.1",
+    "pino": "^9.7.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

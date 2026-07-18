@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@tradebridge/config": ["packages/config/src/index.ts"],
+      "@tradebridge/config/*": ["packages/config/src/*"],
+      "@tradebridge/db": ["packages/db/src/index.ts"],
+      "@tradebridge/db/*": ["packages/db/src/*"],
+      "@tradebridge/types": ["packages/types/src/index.ts"],
+      "@tradebridge/types/*": ["packages/types/src/*"],
+      "@tradebridge/ui": ["packages/ui/src/index.ts"],
+      "@tradebridge/ui/*": ["packages/ui/src/*"]
+    }
+  }
+}

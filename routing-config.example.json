@@ -1,0 +1,9 @@
+{
+  "defaultMode": "quality",
+  "enableLessRestrictiveRouting": true,
+  "neverAutoRouteToLessRestrictive": false,
+  "askBeforeModelClassSwitch": false,
+  "preferToneFidelityOverSanitization": true,
+  "creativeFreedomMode": "balanced",
+  "toneProtection": "neutral"
+}
